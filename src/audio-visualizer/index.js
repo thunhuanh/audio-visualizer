@@ -1,6 +1,21 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerColor = "#40e02445", backgroundColor = "#3b3a39" }) => {
+/**
+ * AudioVisualizer component, which renders a canvas element that displays a
+ * visual representation of the microphone input.
+ *
+ * @param {Object} props - Component props
+ * @param {string} props.color - Color of the circle
+ * @param {string} props.strokeColor - Color of the stroke
+ * @param {string} props.innerColor - Color of the inner circle
+ * @param {string} props.backgroundColor - Background color
+ */
+const AudioVisualizer = ({
+  color = "#40e024",
+  strokeColor = "#40e02445",
+  innerColor = "#40e02445",
+  backgroundColor = "#3b3a39",
+}) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -15,6 +30,7 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
   const rafIdRef = useRef(null);
 
   useEffect(() => {
+    // Handle window resize
     const handleResize = () => {
       setDimensions({
         width: window.innerWidth,
@@ -30,11 +46,15 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
 
+    // Set up audio context and analyser
     const setupAudio = async () => {
       try {
+        // Request access to the microphone
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
+
+        // Create the audio context and analyser
         audioContextRef.current = new (window.AudioContext ||
           window.webkitAudioContext)();
         analyserRef.current = audioContextRef.current.createAnalyser();
@@ -42,10 +62,12 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
           audioContextRef.current.createMediaStreamSource(stream);
         sourceRef.current.connect(analyserRef.current);
 
+        // Set the FFT size
         analyserRef.current.fftSize = 256;
         const bufferLength = analyserRef.current.frequencyBinCount;
         dataArrayRef.current = new Uint8Array(bufferLength);
 
+        // Start capturing microphone data
         setIsCapturing(true);
         draw();
       } catch (error) {
@@ -54,6 +76,7 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
       }
     };
 
+    // Draw the visualizer
     const draw = () => {
       const { width, height } = dimensions;
       canvas.width = width;
@@ -62,15 +85,19 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
       const centerY = height / 2;
       const baseRadius = Math.min(width, height) * 0.15; // Slightly smaller base radius
 
+      // Request the next frame
       rafIdRef.current = requestAnimationFrame(draw);
+
+      // Get the microphone data
       analyserRef.current.getByteFrequencyData(dataArrayRef.current);
 
+      // Clear the canvas
       ctx.fillStyle = backgroundColor; // a little transparent black
       ctx.fillRect(0, 0, width, height);
 
-      // add small base circle
+      // Draw a small base circle
 
-      // draw amplified circle
+      // Draw the amplified circle
       ctx.beginPath();
       const amplitude = dataArrayRef.current.reduce(
         (acc, cur) => Math.max(acc, cur) ,
@@ -78,7 +105,7 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
       );
       let r = baseRadius + (amplitude / 255) * baseRadius * 0.9; // Reduced expansion factor for subtlety
       for (let i = 0; i < 360; i++) {
-        // randomize radius a little bit
+        // Randomize radius a little bit
         let x = centerX + r * Math.cos((i * Math.PI) / 180);
         let y = centerY + r * Math.sin((i * Math.PI) / 180);
 
@@ -90,18 +117,21 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
       }
       ctx.closePath();
 
+      // Fill the circle with the inner color
       ctx.fillStyle = innerColor;
       ctx.fill();
 
-      // Add stroke
+      // Add a stroke with the stroke color
       ctx.strokeStyle = strokeColor;
       ctx.lineWidth = 2;
       ctx.stroke();
     };
 
+    // Set up the audio context and draw the visualizer
     setupAudio();
 
     return () => {
+      // Clean up
       cancelAnimationFrame(rafIdRef.current);
       if (sourceRef.current) {
         sourceRef.current.disconnect();
@@ -130,3 +160,4 @@ const AudioVisualizer = ({ color = "#40e024", strokeColor = "#40e02445", innerCo
 };
 
 export default AudioVisualizer;
+
