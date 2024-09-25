@@ -1,23 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
-/**
- * AudioVisualizer component, which renders a canvas element that displays a
- * visual representation of the microphone input.
- *
- * @param {Object} props - Component props
- * @param {string} props.color - Color of the circle
- * @param {string} props.strokeColor - Color of the stroke
- * @param {string} props.innerColor - Color of the inner circle
- * @param {string} props.backgroundColor - Background color
- */
 const AudioVisualizer = ({
-  color = "#40e024",
-  strokeColor = "#40e02445",
-  innerColor = "#40e02445",
-  backgroundColor = "#3b3a39",
+  strokeColor = "#E0C09790",
+  innerColor = "#E0C09780",
+  backgroundColor = "#2D2424",
 }) => {
-  const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const circleRef = useRef(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [dimensions, setDimensions] = useState({
     width: window.innerWidth,
@@ -30,7 +19,6 @@ const AudioVisualizer = ({
   const rafIdRef = useRef(null);
 
   useEffect(() => {
-    // Handle window resize
     const handleResize = () => {
       setDimensions({
         width: window.innerWidth,
@@ -43,18 +31,12 @@ const AudioVisualizer = ({
   }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-
-    // Set up audio context and analyser
     const setupAudio = async () => {
       try {
-        // Request access to the microphone
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
         });
 
-        // Create the audio context and analyser
         audioContextRef.current = new (window.AudioContext ||
           window.webkitAudioContext)();
         analyserRef.current = audioContextRef.current.createAnalyser();
@@ -62,76 +44,41 @@ const AudioVisualizer = ({
           audioContextRef.current.createMediaStreamSource(stream);
         sourceRef.current.connect(analyserRef.current);
 
-        // Set the FFT size
         analyserRef.current.fftSize = 256;
         const bufferLength = analyserRef.current.frequencyBinCount;
         dataArrayRef.current = new Uint8Array(bufferLength);
 
-        // Start capturing microphone data
         setIsCapturing(true);
-        draw();
+        updateVisualization();
       } catch (error) {
         console.error("Error accessing microphone:", error);
         setIsCapturing(false);
       }
     };
 
-    // Draw the visualizer
-    const draw = () => {
+    const updateVisualization = () => {
       const { width, height } = dimensions;
-      canvas.width = width;
-      canvas.height = height;
-      const centerX = width / 2;
-      const centerY = height / 2;
-      const baseRadius = Math.min(width, height) * 0.15; // Slightly smaller base radius
+      const baseRadius = Math.min(width, height) * 0.15;
 
-      // Request the next frame
-      rafIdRef.current = requestAnimationFrame(draw);
-
-      // Get the microphone data
       analyserRef.current.getByteFrequencyData(dataArrayRef.current);
 
-      // Clear the canvas
-      ctx.fillStyle = backgroundColor; // a little transparent black
-      ctx.fillRect(0, 0, width, height);
-
-      // Draw a small base circle
-
-      // Draw the amplified circle
-      ctx.beginPath();
       const amplitude = dataArrayRef.current.reduce(
-        (acc, cur) => Math.max(acc, cur) ,
+        (acc, cur) => Math.max(acc, cur),
         0
       );
-      let r = baseRadius + (amplitude / 255) * baseRadius * 0.9; // Reduced expansion factor for subtlety
-      for (let i = 0; i < 360; i++) {
-        // Randomize radius a little bit
-        let x = centerX + r * Math.cos((i * Math.PI) / 180);
-        let y = centerY + r * Math.sin((i * Math.PI) / 180);
+      const radius = baseRadius + (amplitude / 255) * baseRadius * 0.9;
 
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
+      if (circleRef.current) {
+        circleRef.current.style.width = `${radius * 2}px`;
+        circleRef.current.style.height = `${radius * 2}px`;
       }
-      ctx.closePath();
 
-      // Fill the circle with the inner color
-      ctx.fillStyle = innerColor;
-      ctx.fill();
-
-      // Add a stroke with the stroke color
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      rafIdRef.current = requestAnimationFrame(updateVisualization);
     };
 
-    // Set up the audio context and draw the visualizer
     setupAudio();
 
     return () => {
-      // Clean up
       cancelAnimationFrame(rafIdRef.current);
       if (sourceRef.current) {
         sourceRef.current.disconnect();
@@ -140,19 +87,51 @@ const AudioVisualizer = ({
         audioContextRef.current.close();
       }
     };
-  }, [color, dimensions, backgroundColor, innerColor, strokeColor]);
+  }, [dimensions]);
 
   return (
-    <div ref={containerRef} className="fixed inset-0 bg-black">
-      <canvas ref={canvasRef} className="w-full h-full" />
+    <div
+      ref={containerRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: backgroundColor,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden'
+      }}
+    >
+      <div
+        ref={circleRef}
+        style={{
+          backgroundColor: innerColor,
+          border: `2px solid ${strokeColor}`,
+          borderRadius: '50%',
+          transition: 'width 0.1s ease-out, height 0.1s ease-out',
+        }}
+      />
       {!isCapturing && (
-        <div className="absolute inset-0 flex items-center justify-center text-white text-center">
-          <div>
-            <p className="text-xl mb-2">
-              Microphone access is required for the visualizer.
-            </p>
-            <p>Please allow microphone access and refresh the page.</p>
-          </div>
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          color: 'white',
+          textAlign: 'center',
+        }}>
+          <p style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>
+            Microphone access is required for the visualizer.
+          </p>
+          <p>Please allow microphone access and refresh the page.</p>
         </div>
       )}
     </div>
@@ -160,4 +139,3 @@ const AudioVisualizer = ({
 };
 
 export default AudioVisualizer;
-
